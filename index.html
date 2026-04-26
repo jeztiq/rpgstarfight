@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RPG StarFight</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+    <div id="homeScreen">
+        <div id="homeContent">
+            <h1>RPG StarFight</h1>
+            <div id="playerSelection">
+                <h2>Choose Your Icon</h2>
+                <button id="star"><i data-lucide="star"></i> Star</button>
+                <button id="rocket"><i data-lucide="rocket"></i> Rocket</button>
+                <button id="shield"><i data-lucide="shield"></i> Shield</button>
+                <button id="heart"><i data-lucide="heart"></i> Heart</button>
+                <button id="zap"><i data-lucide="zap"></i> Zap</button>
+            </div>
+            <p id="clickToPlay" style="display: none;">Click to play</p>
+            <button id="startButton" style="display: none;">Start Game</button>
+        </div>
+    </div>
+    <div id="leftSidebar">
+        <div class="sidebar-card">
+            <div class="sidebar-card-header">
+                <span>Game Tips</span>
+                <i data-lucide="sparkles"></i>
+            </div>
+            <ul>
+                <li>Use LEFT/RIGHT arrows or touch buttons to move.</li>
+                <li>Press SPACE or FIRE to shoot enemies (1 shot for non-shooters, 2 for shooters).</li>
+                <li>Do not shoot green civilians — the game ends if you do.</li>
+                <li>Avoid 6 enemy shots — they end the game.</li>
+                <li>Keep fewer than 5 enemies past your line.</li>
+                <li>Speed increases after 10 kills.</li>
+            </ul>
+        </div>
+        <div class="sidebar-card">
+            <div class="sidebar-card-header">
+                <span>Score Card</span>
+                <i data-lucide="award"></i>
+            </div>
+            <p class="card-description">Each enemy destroyed gives you 10 points. Stay alive longer for higher combos and faster rewards.</p>
+        </div>
+        <div class="sidebar-card">
+            <div class="sidebar-card-header">
+                <span>Control</span>
+                <i data-lucide="keyboard"></i>
+            </div>
+            <p class="card-description">Touch controls appear on phones. Use the side controls to move and fire quickly.</p>
+        </div>
+    </div>
+    <div id="rightSidebar">
+        <div class="sidebar-card">
+            <div class="sidebar-card-header">
+                <span>Battle Settings</span>
+                <i data-lucide="sliders-horizontal"></i>
+            </div>
+            <label for="enemyCountSlider">Max enemies: <span id="enemyCountValue">3</span></label>
+            <input id="enemyCountSlider" type="range" min="1" max="10" value="3">
+            <label for="enemySpeedSlider">Enemy speed: <span id="enemySpeedValue">1.0</span></label>
+            <input id="enemySpeedSlider" type="range" min="1" max="10" step="0.1" value="1">
+            <label for="controlSpeedSlider">Control speed: <span id="controlSpeedValue">1.0</span></label>
+            <input id="controlSpeedSlider" type="range" min="1" max="10" step="0.1" value="1">
+        </div>
+        <div class="sidebar-card">
+            <div class="sidebar-card-header">
+                <span>Power Surge</span>
+                <i data-lucide="trending-up"></i>
+            </div>
+            <p class="card-description">Enemy speed will automatically increase after 10 kills, making the fight more intense as you dominate.</p>
+        </div>
+        <div class="sidebar-card">
+            <div class="sidebar-card-header">
+                <span>Quick Notes</span>
+                <i data-lucide="info"></i>
+            </div>
+            <p class="card-description">You can pause the game anytime with the HUD button or press P on your keyboard.</p>
+        </div>
+    </div>
+    <div id="hud">
+        <div id="score">Score: 0</div>
+        <div id="timer">Time: 30 | Missed: 0/5</div>
+        <div id="instructions">Use LEFT/RIGHT arrows to move, press SPACE to shoot.</div>
+        <button id="pauseButton" class="hud-button">Pause</button>
+    </div>
+    <div id="mobileControls">
+        <button id="touchLeft" class="mobile-control">◀</button>
+        <button id="touchFire" class="mobile-control fire">FIRE</button>
+        <button id="touchRight" class="mobile-control">▶</button>
+    </div>
+    <div id="gameOver" style="display: none;">
+        <div id="gameOverReason"></div>
+        <div>Final Score: <span id="finalScore"></span></div>
+        <br>
+        <button id="replayButton">Replay</button>
+        <button id="closeButton">Close</button>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

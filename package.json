@@ -1,0 +1,8 @@
+{
+  "name": "rpgstarfight",
+  "version": "1.0.0",
+  "description": "A simple RPG starfight game",
+  "scripts": {
+    "dev": "python3 -m http.server 3000"
+  }
+}
