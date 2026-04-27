@@ -1,7 +1,8 @@
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer();
+const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.domElement.style.position = 'absolute';
 renderer.domElement.style.top = '0';
 renderer.domElement.style.left = '0';
@@ -16,7 +17,6 @@ let player;
 const enemies = [];
 const bullets = [];
 const civilians = [];
-const fireClouds = [];
 const enemyBullets = [];
 
 let score = 0;
@@ -33,8 +33,6 @@ let killCount = 0;
 let lastSpawnTime = 0;
 let lastCivilianSpawn = 0;
 let civilianSpawnIntervalMs = 7000;
-let lastFireCloudSpawn = 0;
-let fireCloudSpawnIntervalMs = 2000;
 let playerHits = 0;
 let gameOverReason = '';
 const iconCache = {};
@@ -63,6 +61,9 @@ const touchRightButton = document.getElementById('touchRight');
 const touchFireButton = document.getElementById('touchFire');
 let touchLeftActive = false;
 let touchRightActive = false;
+let mouseTargetX = 0;
+const pointerNDC = new THREE.Vector2(0, 0);
+const pointerWorld = new THREE.Vector3();
 
 const playerButtons = {
     star: document.getElementById('star'),
@@ -125,7 +126,7 @@ function createPlayer() {
     const texture = createLucideTexture(playerType);
     const material = new THREE.SpriteMaterial({ map: texture, color: 0xffffff, transparent: true });
     const sprite = new THREE.Sprite(material);
-    sprite.scale.set(1.4, 1.4, 1);
+    sprite.scale.set(1.05, 1.05, 1);
     return sprite;
 }
 
@@ -135,7 +136,7 @@ function createEnemy() {
     const texture = createLucideTexture(iconName);
     const material = new THREE.SpriteMaterial({ map: texture, color: 0xff7070, transparent: true });
     const sprite = new THREE.Sprite(material);
-    sprite.scale.set(0.75, 0.75, 1);
+    sprite.scale.set(0.58, 0.58, 1);
     sprite.userData = { hits: 0, shooter: Math.random() < 0.5 };
     return sprite;
 }
@@ -144,23 +145,11 @@ function createCivilian() {
     const texture = createLucideTexture('user');
     const material = new THREE.SpriteMaterial({ map: texture, color: 0x7fe57f, transparent: true });
     const sprite = new THREE.Sprite(material);
-    sprite.scale.set(0.85, 0.85, 1);
+    sprite.scale.set(0.65, 0.65, 1);
     sprite.userData = {
         type: 'civilian',
-        vx: Math.random() < 0.5 ? -0.015 : 0.015
-    };
-    return sprite;
-}
-
-function createFireCloud() {
-    const texture = createLucideTexture('flame');
-    const material = new THREE.SpriteMaterial({ map: texture, color: 0xff4500, transparent: true, opacity: 0.8 });
-    const sprite = new THREE.Sprite(material);
-    sprite.scale.set(1.2, 1.2, 1);
-    sprite.userData = {
-        type: 'fireCloud',
-        life: 3000, // milliseconds
-        startTime: performance.now()
+        vx: Math.random() < 0.5 ? -0.015 : 0.015,
+        hurt: false
     };
     return sprite;
 }
@@ -222,16 +211,15 @@ function startGame() {
     enemies.forEach(enemy => scene.remove(enemy));
     bullets.forEach(bullet => scene.remove(bullet));
     civilians.forEach(civilian => scene.remove(civilian));
-    fireClouds.forEach(cloud => scene.remove(cloud));
     enemyBullets.forEach(bullet => scene.remove(bullet));
     enemies.length = 0;
     bullets.length = 0;
     civilians.length = 0;
-    fireClouds.length = 0;
     enemyBullets.length = 0;
     if (player) scene.remove(player);
     player = createPlayer();
     player.position.set(0, -4, 0);
+    mouseTargetX = player.position.x;
     scene.add(player);
 }
 
@@ -252,6 +240,7 @@ closeButton.addEventListener('click', () => {
     gameOverElement.style.display = 'none';
     homeScreenElement.style.display = 'flex';
 });
+pauseButton.addEventListener('click', togglePause);
 
 enemyCountSlider.addEventListener('input', updateSettings);
 enemySpeedSlider.addEventListener('input', updateSettings);
@@ -281,12 +270,54 @@ if (touchFireButton) {
 updateSettings();
 updateMobileControlsVisibility();
 window.addEventListener('resize', updateMobileControlsVisibility);
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+});
 
 const spawnLineThreshold = 2.5;
 let enemySpawnIntervalMs = 2000;
+const civilianFallSpeed = 0.03;
+const civilianAvoidRadius = 4.5;
+const civilianAvoidForce = 0.02;
+const civilianFireLaneHalfWidth = 0.9;
+const civilianFireLaneAvoidForce = 0.06;
+const civilianSpawnEnemyClearanceX = 1.2;
+const civilianSpawnPlayerClearanceX = 1.6;
+const civilianGrazeRadius = 0.42;
+const civilianHeartRadius = 0.16;
 
 function canSpawnEnemy() {
     return enemies.length < maxEnemies && !enemies.some(enemy => enemy.position.y > spawnLineThreshold);
+}
+
+function getCivilianSpawnX() {
+    for (let i = 0; i < 12; i++) {
+        const candidate = Math.random() < 0.5
+            ? THREE.MathUtils.randFloat(-4.5, -2.2)
+            : THREE.MathUtils.randFloat(2.2, 4.5);
+        const tooCloseToEnemy = enemies.some(enemy => Math.abs(enemy.position.x - candidate) < civilianSpawnEnemyClearanceX);
+        const tooCloseToPlayer = player && Math.abs(player.position.x - candidate) < civilianSpawnPlayerClearanceX;
+        if (!tooCloseToEnemy && !tooCloseToPlayer) return candidate;
+    }
+    return Math.random() < 0.5
+        ? THREE.MathUtils.randFloat(-4.5, -2.2)
+        : THREE.MathUtils.randFloat(2.2, 4.5);
+}
+
+function isCivilianInProtectedFireLane(civilian) {
+    if (!player) return false;
+    return enemies.some(enemy => {
+        if (enemy.position.y <= player.position.y + 0.1) return false;
+        if (civilian.position.y >= enemy.position.y || civilian.position.y <= player.position.y) return false;
+
+        const laneProgress = (civilian.position.y - player.position.y) / (enemy.position.y - player.position.y);
+        if (laneProgress <= 0 || laneProgress >= 1) return false;
+        const laneX = THREE.MathUtils.lerp(player.position.x, enemy.position.x, laneProgress);
+        return Math.abs(civilian.position.x - laneX) <= (civilianFireLaneHalfWidth + 0.35);
+    });
 }
 
 const timerInterval = setInterval(() => {
@@ -299,10 +330,49 @@ const timerInterval = setInterval(() => {
     }
 }, 1000);
 
-window.addEventListener('mousemove', (event) => {
-    if (!gameRunning || !player) return;
-    const normalizedX = (event.clientX / window.innerWidth) * 2 - 1;
-    player.position.x = THREE.MathUtils.clamp(normalizedX * 5, -5, 5);
+function updateMouseTargetFromPointer(event) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+
+    pointerNDC.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    pointerNDC.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+    pointerWorld.set(pointerNDC.x, pointerNDC.y, 0.5).unproject(camera);
+    const direction = pointerWorld.sub(camera.position);
+    if (Math.abs(direction.z) < 0.0001) return null;
+    const t = -camera.position.z / direction.z;
+    const worldX = camera.position.x + direction.x * t;
+    return THREE.MathUtils.clamp(worldX, -5, 5);
+}
+
+function handlePointerUpdate(event) {
+    if (!gameRunning || !player || paused) return;
+    const targetX = updateMouseTargetFromPointer(event);
+    if (targetX === null) return;
+    mouseTargetX = targetX;
+    // Apply immediately to remove frame-lag feeling.
+    player.position.x = mouseTargetX;
+}
+
+window.addEventListener('pointermove', handlePointerUpdate);
+if ('onpointerrawupdate' in window) {
+    window.addEventListener('pointerrawupdate', handlePointerUpdate);
+}
+window.addEventListener('pointerdown', (event) => {
+    if (!gameRunning || !player || paused || event.button !== 0) return;
+    const targetX = updateMouseTargetFromPointer(event);
+    if (targetX === null) return;
+    mouseTargetX = targetX;
+    player.position.x = mouseTargetX;
+});
+renderer.domElement.addEventListener('mousedown', (event) => {
+    if (!gameRunning) return;
+    if (event.button === 0) {
+        createBullet();
+    }
+});
+renderer.domElement.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
 });
 
 const keys = {};
@@ -328,6 +398,7 @@ function animate() {
     requestAnimationFrame(animate);
 
     if (gameRunning && !paused) {
+        player.position.x = mouseTargetX;
         if (keys['ArrowLeft'] || touchLeftActive) player.position.x -= playerSpeed;
         if (keys['ArrowRight'] || touchRightActive) player.position.x += playerSpeed;
         player.position.x = THREE.MathUtils.clamp(player.position.x, -5, 5);
@@ -343,19 +414,11 @@ function animate() {
         if (now - lastCivilianSpawn > civilianSpawnIntervalMs && civilians.length < 2) {
             lastCivilianSpawn = now;
             const civilian = createCivilian();
-            const xSide = Math.random() < 0.5 ? THREE.MathUtils.randFloat(-4.5, -2.2) : THREE.MathUtils.randFloat(2.2, 4.5);
+            const xSide = getCivilianSpawnX();
             civilian.position.set(xSide, 5.5, 0);
             scene.add(civilian);
             civilians.push(civilian);
         }
-        if (killCount >= 10 && now - lastFireCloudSpawn > fireCloudSpawnIntervalMs) {
-            lastFireCloudSpawn = now;
-            const fireCloud = createFireCloud();
-            fireCloud.position.set((Math.random() - 0.5) * 8, -4, 0);
-            scene.add(fireCloud);
-            fireClouds.push(fireCloud);
-        }
-
         enemies.forEach(enemy => {
             enemy.position.y -= enemyFallSpeed;
             if (enemy.userData.shooter && Math.random() < 0.005) { // Chance to shoot
@@ -382,7 +445,48 @@ function animate() {
         });
 
         civilians.forEach(civilian => {
-            civilian.position.y -= 0.03;
+            let avoidX = 0;
+            let avoidY = 0;
+            let closestEnemyDistance = Infinity;
+
+            enemies.forEach(enemy => {
+                const dx = civilian.position.x - enemy.position.x;
+                const dy = civilian.position.y - enemy.position.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance >= civilianAvoidRadius) return;
+
+                closestEnemyDistance = Math.min(closestEnemyDistance, distance);
+                const safeDistance = Math.max(distance, 0.2);
+                const influence = (civilianAvoidRadius - distance) / civilianAvoidRadius;
+                avoidX += (dx / safeDistance) * influence;
+                avoidY += (dy / safeDistance) * influence;
+            });
+
+            if (closestEnemyDistance < Infinity) {
+                civilian.userData.vx += avoidX * civilianAvoidForce;
+                civilian.position.y += avoidY * civilianAvoidForce;
+            }
+
+            if (player) {
+                enemies.forEach(enemy => {
+                    if (enemy.position.y <= player.position.y + 0.1) return;
+                    if (civilian.position.y >= enemy.position.y || civilian.position.y <= player.position.y) return;
+
+                    const laneProgress = (civilian.position.y - player.position.y) / (enemy.position.y - player.position.y);
+                    const laneX = THREE.MathUtils.lerp(player.position.x, enemy.position.x, laneProgress);
+                    const offsetX = civilian.position.x - laneX;
+                    const overlap = civilianFireLaneHalfWidth - Math.abs(offsetX);
+                    if (overlap <= 0) return;
+
+                    const pushDirection = offsetX === 0 ? (civilian.userData.vx >= 0 ? 1 : -1) : Math.sign(offsetX);
+                    const intensity = overlap / civilianFireLaneHalfWidth;
+                    civilian.userData.vx += pushDirection * civilianFireLaneAvoidForce * intensity;
+                    civilian.position.y += 0.025 * intensity;
+                });
+            }
+
+            civilian.userData.vx = THREE.MathUtils.clamp(civilian.userData.vx * 0.98, -0.06, 0.06);
+            civilian.position.y -= civilianFallSpeed;
             civilian.position.x += civilian.userData.vx;
             if (civilian.position.x < -4.8 || civilian.position.x > 4.8) {
                 civilian.userData.vx *= -1;
@@ -391,17 +495,6 @@ function animate() {
             if (civilian.position.y < -6) {
                 scene.remove(civilian);
                 civilians.splice(civilians.indexOf(civilian), 1);
-            }
-        });
-
-        fireClouds.forEach(cloud => {
-            cloud.position.y += 0.05;
-            const elapsed = performance.now() - cloud.userData.startTime;
-            const progress = elapsed / cloud.userData.life;
-            cloud.material.opacity = Math.max(0, 0.8 * (1 - progress));
-            if (progress >= 1) {
-                scene.remove(cloud);
-                fireClouds.splice(fireClouds.indexOf(cloud), 1);
             }
         });
 
@@ -423,13 +516,24 @@ function animate() {
 
         bullets.forEach(bullet => {
             civilians.forEach(civilian => {
-                if (bullet.position.distanceTo(civilian.position) < 1) {
-                    scene.remove(bullet);
+                const distance = bullet.position.distanceTo(civilian.position);
+                if (distance >= civilianGrazeRadius) return;
+                if (isCivilianInProtectedFireLane(civilian)) return;
+
+                scene.remove(bullet);
+                bullets.splice(bullets.indexOf(bullet), 1);
+
+                if (distance <= civilianHeartRadius) {
                     scene.remove(civilian);
-                    bullets.splice(bullets.indexOf(bullet), 1);
                     civilians.splice(civilians.indexOf(civilian), 1);
-                    gameOverReason = "Shot a civilian!";
+                    gameOverReason = "Civilian fatally shot!";
                     endGame();
+                    return;
+                }
+
+                if (!civilian.userData.hurt) {
+                    civilian.userData.hurt = true;
+                    civilian.material.color.setHex(0xffd54f);
                 }
             });
         });

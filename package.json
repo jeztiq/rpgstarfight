@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "A simple RPG starfight game",
   "scripts": {
-    "dev": "python3 -m http.server 3000"
+    "dev": "serve . -l 3000"
+  },
+  "devDependencies": {
+    "serve": "^14.2.5"
   }
 }
