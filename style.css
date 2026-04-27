@@ -4,7 +4,8 @@ body {
     overflow: hidden;
     background: black;
     font-family: Arial, sans-serif;
-    touch-action: manipulation;
+    touch-action: none;
+    overscroll-behavior: none;
 }
 
 #homeScreen {
@@ -224,7 +225,7 @@ body {
     background: rgba(255, 255, 255, 0.16);
     backdrop-filter: blur(10px);
     cursor: pointer;
-    touch-action: manipulation;
+    touch-action: none;
 }
 
 #mobileControls button.fire {
@@ -443,5 +444,36 @@ body {
         bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
         min-width: 116px;
         font-size: 13px;
+    }
+}
+
+/* Hard mobile overrides (device-based, not width-based). */
+.mobile-game-ui #leftSidebar,
+.mobile-game-ui #rightSidebar {
+    display: none !important;
+}
+
+.mobile-game-ui #rotateNotice {
+    display: none;
+}
+
+@media (orientation: portrait) {
+    .mobile-game-ui #rotateNotice {
+        display: flex;
+    }
+
+    .mobile-game-ui #mobileControls,
+    .mobile-game-ui #hud {
+        display: none !important;
+    }
+}
+
+@media (orientation: landscape) {
+    .mobile-game-ui #rotateNotice {
+        display: none;
+    }
+
+    .mobile-game-ui #mobileControls {
+        display: block !important;
     }
 }

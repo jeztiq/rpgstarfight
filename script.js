@@ -11,6 +11,16 @@ renderer.domElement.style.touchAction = 'none';
 document.body.appendChild(renderer.domElement);
 
 let lastTouchEnd = 0;
+document.addEventListener('touchstart', (event) => {
+    if (event.touches.length > 1) {
+        event.preventDefault();
+    }
+}, { passive: false });
+document.addEventListener('touchmove', (event) => {
+    if (event.touches.length > 1) {
+        event.preventDefault();
+    }
+}, { passive: false });
 document.addEventListener('touchend', (event) => {
     const now = Date.now();
     if (now - lastTouchEnd <= 300) {
@@ -173,8 +183,12 @@ function isMobileTouch() {
 function updateMobileControlsVisibility() {
     if (!mobileControls) return;
     const isLandscape = window.matchMedia('(orientation: landscape)').matches;
-    const visible = isMobileTouch() && window.innerWidth <= 900 && isLandscape;
+    const visible = isMobileTouch() && isLandscape;
     mobileControls.style.display = visible ? 'block' : 'none';
+}
+
+function updateMobileDeviceClass() {
+    document.body.classList.toggle('mobile-game-ui', isMobileTouch());
 }
 
 function updateSettings() {
@@ -281,8 +295,12 @@ if (touchFireButton) {
 }
 
 updateSettings();
+updateMobileDeviceClass();
 updateMobileControlsVisibility();
 window.addEventListener('resize', updateMobileControlsVisibility);
+window.addEventListener('resize', updateMobileDeviceClass);
+window.addEventListener('orientationchange', updateMobileDeviceClass);
+window.addEventListener('orientationchange', updateMobileControlsVisibility);
 window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
