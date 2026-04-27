@@ -189,6 +189,28 @@ function updateMobileDeviceClass() {
     document.body.classList.toggle('mobile-game-ui', isMobileTouch());
 }
 
+function requestFullscreenForLandscape() {
+    if (!isMobileTouch()) return;
+    const isLandscape = window.matchMedia('(orientation: landscape)').matches;
+    if (!isLandscape || document.fullscreenElement) return;
+
+    const docEl = document.documentElement;
+    const requestFullscreen =
+        docEl.requestFullscreen ||
+        docEl.webkitRequestFullscreen ||
+        docEl.msRequestFullscreen;
+    if (!requestFullscreen) return;
+
+    try {
+        const result = requestFullscreen.call(docEl);
+        if (result && typeof result.catch === 'function') {
+            result.catch(() => {});
+        }
+    } catch (_) {
+        // Ignore failures; some browsers only allow fullscreen after explicit gestures.
+    }
+}
+
 function updateSettings() {
     maxEnemies = parseInt(enemyCountSlider.value, 10);
     baseEnemyFallSpeed = parseFloat(enemySpeedSlider.value) * 0.05;
@@ -248,6 +270,7 @@ function startGame() {
     touchMoveValue = 0;
     if (touchMoveSlider) touchMoveSlider.value = '0';
     scene.add(player);
+    requestFullscreenForLandscape();
 }
 
 function endGame() {
@@ -298,6 +321,10 @@ window.addEventListener('resize', updateMobileControlsVisibility);
 window.addEventListener('resize', updateMobileDeviceClass);
 window.addEventListener('orientationchange', updateMobileDeviceClass);
 window.addEventListener('orientationchange', updateMobileControlsVisibility);
+window.addEventListener('resize', requestFullscreenForLandscape);
+window.addEventListener('orientationchange', requestFullscreenForLandscape);
+window.addEventListener('touchstart', requestFullscreenForLandscape, { passive: true });
+window.addEventListener('pointerdown', requestFullscreenForLandscape);
 window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
