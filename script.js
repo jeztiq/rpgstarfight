@@ -80,7 +80,14 @@ const controlSpeedValue = document.getElementById('controlSpeedValue');
 const mobileControls = document.getElementById('mobileControls');
 const touchMoveSlider = document.getElementById('touchMoveSlider');
 const touchFireButton = document.getElementById('touchFire');
-let touchMoveValue = 0;
+const fullscreenPromptElement = document.getElementById('fullscreenPrompt');
+const enterFullscreenButton = document.getElementById('enterFullscreenButton');
+const inputState = {
+    keyboardAxis: 0,
+    touchAxis: 0
+};
+const touchDeadzone = 0.08;
+const touchSensitivity = 1.6;
 let mouseTargetX = 0;
 const pointerNDC = new THREE.Vector2(0, 0);
 const pointerWorld = new THREE.Vector3();
@@ -178,15 +185,32 @@ function isMobileTouch() {
     return ('ontouchstart' in window) || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
 }
 
-function updateMobileControlsVisibility() {
-    if (!mobileControls) return;
+function getDisplayModeState() {
+    if (!isMobileTouch()) return 'desktop';
     const isLandscape = window.matchMedia('(orientation: landscape)').matches;
-    const visible = isMobileTouch() && isLandscape;
-    mobileControls.style.display = visible ? 'block' : 'none';
+    return isLandscape ? 'mobile-landscape' : 'mobile-portrait';
 }
 
-function updateMobileDeviceClass() {
-    document.body.classList.toggle('mobile-game-ui', isMobileTouch());
+function updateDisplayMode() {
+    const mode = getDisplayModeState();
+    document.body.classList.toggle('mobile-game-ui', mode !== 'desktop');
+    document.body.classList.toggle('mobile-portrait-ui', mode === 'mobile-portrait');
+
+    if (mobileControls) {
+        mobileControls.style.display = mode === 'mobile-landscape' ? 'block' : 'none';
+    }
+    updateFullscreenPromptVisibility();
+}
+
+function getMoveAxis() {
+    return THREE.MathUtils.clamp(inputState.keyboardAxis + inputState.touchAxis, -1, 1);
+}
+
+function updateFullscreenPromptVisibility() {
+    if (!fullscreenPromptElement) return;
+    const mode = getDisplayModeState();
+    const shouldShow = mode === 'mobile-landscape' && !isFullscreenActive() && gameRunning;
+    fullscreenPromptElement.style.display = shouldShow ? 'flex' : 'none';
 }
 
 function isFullscreenActive() {
@@ -200,7 +224,10 @@ function isFullscreenActive() {
 function requestFullscreenForLandscape() {
     if (!isMobileTouch()) return;
     const isLandscape = window.matchMedia('(orientation: landscape)').matches;
-    if (!isLandscape || isFullscreenActive()) return;
+    if (!isLandscape || isFullscreenActive()) {
+        updateFullscreenPromptVisibility();
+        return;
+    }
 
     const fullscreenTargets = [renderer.domElement, document.documentElement, document.body].filter(Boolean);
     for (const target of fullscreenTargets) {
@@ -215,11 +242,13 @@ function requestFullscreenForLandscape() {
             if (result && typeof result.catch === 'function') {
                 result.catch(() => {});
             }
+            updateFullscreenPromptVisibility();
             break;
         } catch (_) {
             // Try the next fallback target.
         }
     }
+    updateFullscreenPromptVisibility();
 }
 
 function updateSettings() {
@@ -278,9 +307,10 @@ function startGame() {
     player = createPlayer();
     player.position.set(0, -4, 0);
     mouseTargetX = player.position.x;
-    touchMoveValue = 0;
+    inputState.touchAxis = 0;
     if (touchMoveSlider) touchMoveSlider.value = '0';
     scene.add(player);
+    updateDisplayMode();
     requestFullscreenForLandscape();
 }
 
@@ -289,6 +319,7 @@ function endGame() {
     finalScoreElement.textContent = score;
     gameOverReasonElement.textContent = gameOverReason;
     gameOverElement.style.display = 'block';
+    updateFullscreenPromptVisibility();
 }
 
 Object.keys(playerButtons).forEach(type => {
@@ -302,8 +333,13 @@ replayButton.addEventListener('touchstart', requestFullscreenForLandscape);
 closeButton.addEventListener('click', () => {
     gameOverElement.style.display = 'none';
     homeScreenElement.style.display = 'flex';
+    updateFullscreenPromptVisibility();
 });
 pauseButton.addEventListener('click', togglePause);
+if (enterFullscreenButton) {
+    enterFullscreenButton.addEventListener('click', requestFullscreenForLandscape);
+    enterFullscreenButton.addEventListener('touchstart', requestFullscreenForLandscape);
+}
 
 enemyCountSlider.addEventListener('input', updateSettings);
 enemySpeedSlider.addEventListener('input', updateSettings);
@@ -311,11 +347,18 @@ controlSpeedSlider.addEventListener('input', updateSettings);
 
 if (touchMoveSlider) {
     const updateTouchMoveValue = () => {
-        touchMoveValue = THREE.MathUtils.clamp(parseFloat(touchMoveSlider.value) || 0, -100, 100) / 100;
+        const rawValue = THREE.MathUtils.clamp(parseFloat(touchMoveSlider.value) || 0, -100, 100) / 100;
+        const magnitude = Math.abs(rawValue);
+        if (magnitude <= touchDeadzone) {
+            inputState.touchAxis = 0;
+            return;
+        }
+        const normalized = (magnitude - touchDeadzone) / (1 - touchDeadzone);
+        inputState.touchAxis = Math.sign(rawValue) * Math.pow(normalized, touchSensitivity);
     };
     const releaseTouchMove = () => {
         touchMoveSlider.value = '0';
-        touchMoveValue = 0;
+        inputState.touchAxis = 0;
     };
     touchMoveSlider.addEventListener('input', updateTouchMoveValue);
     touchMoveSlider.addEventListener('touchend', releaseTouchMove);
@@ -332,16 +375,16 @@ if (touchFireButton) {
 }
 
 updateSettings();
-updateMobileDeviceClass();
-updateMobileControlsVisibility();
-window.addEventListener('resize', updateMobileControlsVisibility);
-window.addEventListener('resize', updateMobileDeviceClass);
-window.addEventListener('orientationchange', updateMobileDeviceClass);
-window.addEventListener('orientationchange', updateMobileControlsVisibility);
+updateDisplayMode();
+window.addEventListener('resize', updateDisplayMode);
+window.addEventListener('orientationchange', updateDisplayMode);
 window.addEventListener('resize', requestFullscreenForLandscape);
 window.addEventListener('orientationchange', requestFullscreenForLandscape);
 window.addEventListener('touchstart', requestFullscreenForLandscape);
 window.addEventListener('pointerdown', requestFullscreenForLandscape);
+document.addEventListener('fullscreenchange', updateFullscreenPromptVisibility);
+document.addEventListener('webkitfullscreenchange', updateFullscreenPromptVisibility);
+document.addEventListener('msfullscreenchange', updateFullscreenPromptVisibility);
 window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
@@ -450,32 +493,39 @@ renderer.domElement.addEventListener('contextmenu', (event) => {
 });
 
 const keys = {};
+function updateKeyboardAxis() {
+    const leftActive = !!keys['ArrowLeft'];
+    const rightActive = !!keys['ArrowRight'];
+    inputState.keyboardAxis = rightActive === leftActive ? 0 : (leftActive ? -1 : 1);
+}
+
 window.addEventListener('keydown', e => {
     if (e.key === 'p' || e.key === 'P') {
         togglePause();
         return;
     }
     keys[e.key] = true;
+    updateKeyboardAxis();
     if ((e.key === ' ' || e.code === 'Space') && gameRunning && !paused) {
         createBullet();
     }
-    if (e.key === 'ArrowLeft' && gameRunning && !paused) {
-        player.position.x -= playerSpeed;
-    }
-    if (e.key === 'ArrowRight' && gameRunning && !paused) {
-        player.position.x += playerSpeed;
-    }
 });
-window.addEventListener('keyup', e => keys[e.key] = false);
+window.addEventListener('keyup', e => {
+    keys[e.key] = false;
+    updateKeyboardAxis();
+});
 
 function animate() {
     requestAnimationFrame(animate);
 
     if (gameRunning && !paused) {
-        player.position.x = mouseTargetX;
-        if (keys['ArrowLeft']) player.position.x -= playerSpeed;
-        if (keys['ArrowRight']) player.position.x += playerSpeed;
-        if (touchMoveValue !== 0) player.position.x += touchMoveValue * playerSpeed * 1.8;
+        if (!isMobileTouch()) {
+            player.position.x = mouseTargetX;
+        }
+        const moveAxis = getMoveAxis();
+        if (moveAxis !== 0) {
+            player.position.x += moveAxis * playerSpeed * 1.8;
+        }
         player.position.x = THREE.MathUtils.clamp(player.position.x, -5, 5);
 
         const now = performance.now();
