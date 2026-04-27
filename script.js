@@ -189,25 +189,36 @@ function updateMobileDeviceClass() {
     document.body.classList.toggle('mobile-game-ui', isMobileTouch());
 }
 
+function isFullscreenActive() {
+    return !!(
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.msFullscreenElement
+    );
+}
+
 function requestFullscreenForLandscape() {
     if (!isMobileTouch()) return;
     const isLandscape = window.matchMedia('(orientation: landscape)').matches;
-    if (!isLandscape || document.fullscreenElement) return;
+    if (!isLandscape || isFullscreenActive()) return;
 
-    const docEl = document.documentElement;
-    const requestFullscreen =
-        docEl.requestFullscreen ||
-        docEl.webkitRequestFullscreen ||
-        docEl.msRequestFullscreen;
-    if (!requestFullscreen) return;
+    const fullscreenTargets = [renderer.domElement, document.documentElement, document.body].filter(Boolean);
+    for (const target of fullscreenTargets) {
+        const requestFullscreen =
+            target.requestFullscreen ||
+            target.webkitRequestFullscreen ||
+            target.msRequestFullscreen;
+        if (!requestFullscreen) continue;
 
-    try {
-        const result = requestFullscreen.call(docEl);
-        if (result && typeof result.catch === 'function') {
-            result.catch(() => {});
+        try {
+            const result = requestFullscreen.call(target, { navigationUI: 'hide' });
+            if (result && typeof result.catch === 'function') {
+                result.catch(() => {});
+            }
+            break;
+        } catch (_) {
+            // Try the next fallback target.
         }
-    } catch (_) {
-        // Ignore failures; some browsers only allow fullscreen after explicit gestures.
     }
 }
 
@@ -286,6 +297,8 @@ Object.keys(playerButtons).forEach(type => {
 
 startButton.addEventListener('click', startGame);
 replayButton.addEventListener('click', startGame);
+startButton.addEventListener('touchstart', requestFullscreenForLandscape);
+replayButton.addEventListener('touchstart', requestFullscreenForLandscape);
 closeButton.addEventListener('click', () => {
     gameOverElement.style.display = 'none';
     homeScreenElement.style.display = 'flex';
@@ -308,10 +321,14 @@ if (touchMoveSlider) {
     touchMoveSlider.addEventListener('touchend', releaseTouchMove);
     touchMoveSlider.addEventListener('mouseup', releaseTouchMove);
     touchMoveSlider.addEventListener('mouseleave', releaseTouchMove);
+    touchMoveSlider.addEventListener('touchstart', requestFullscreenForLandscape);
+    touchMoveSlider.addEventListener('pointerdown', requestFullscreenForLandscape);
 }
 if (touchFireButton) {
     touchFireButton.addEventListener('touchstart', (e) => { e.preventDefault(); createBullet(); });
     touchFireButton.addEventListener('mousedown', createBullet);
+    touchFireButton.addEventListener('touchstart', requestFullscreenForLandscape);
+    touchFireButton.addEventListener('pointerdown', requestFullscreenForLandscape);
 }
 
 updateSettings();
@@ -323,7 +340,7 @@ window.addEventListener('orientationchange', updateMobileDeviceClass);
 window.addEventListener('orientationchange', updateMobileControlsVisibility);
 window.addEventListener('resize', requestFullscreenForLandscape);
 window.addEventListener('orientationchange', requestFullscreenForLandscape);
-window.addEventListener('touchstart', requestFullscreenForLandscape, { passive: true });
+window.addEventListener('touchstart', requestFullscreenForLandscape);
 window.addEventListener('pointerdown', requestFullscreenForLandscape);
 window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
