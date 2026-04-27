@@ -7,7 +7,19 @@ renderer.domElement.style.position = 'absolute';
 renderer.domElement.style.top = '0';
 renderer.domElement.style.left = '0';
 renderer.domElement.style.zIndex = '0';
+renderer.domElement.style.touchAction = 'none';
 document.body.appendChild(renderer.domElement);
+
+let lastTouchEnd = 0;
+document.addEventListener('touchend', (event) => {
+    const now = Date.now();
+    if (now - lastTouchEnd <= 300) {
+        event.preventDefault();
+    }
+    lastTouchEnd = now;
+}, { passive: false });
+document.addEventListener('dblclick', (event) => event.preventDefault());
+document.addEventListener('gesturestart', (event) => event.preventDefault());
 
 camera.position.set(0, 0, 10);
 camera.lookAt(0, 0, 0);
@@ -160,8 +172,9 @@ function isMobileTouch() {
 
 function updateMobileControlsVisibility() {
     if (!mobileControls) return;
-    const visible = isMobileTouch() && window.innerWidth <= 768;
-    mobileControls.style.display = visible ? 'flex' : 'none';
+    const isLandscape = window.matchMedia('(orientation: landscape)').matches;
+    const visible = isMobileTouch() && window.innerWidth <= 900 && isLandscape;
+    mobileControls.style.display = visible ? 'block' : 'none';
 }
 
 function updateSettings() {
