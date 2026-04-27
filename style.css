@@ -362,15 +362,59 @@ body {
         position: absolute;
         left: calc(env(safe-area-inset-left, 0px) + 12px);
         bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
-        display: grid;
-        grid-template-columns: repeat(2, minmax(64px, 84px));
-        gap: 10px;
+        width: min(42vw, 220px);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
         pointer-events: auto;
     }
 
-    #touchLeft,
-    #touchRight {
-        min-width: 64px;
+    #mobileMovePad label {
+        color: #dfe6ff;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        font-weight: 700;
+        text-transform: uppercase;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+    }
+
+    #touchMoveSlider {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        height: 52px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.35);
+        background: linear-gradient(90deg, rgba(110, 150, 255, 0.35) 0%, rgba(255, 255, 255, 0.18) 50%, rgba(255, 110, 110, 0.35) 100%);
+        backdrop-filter: blur(6px);
+        touch-action: none;
+    }
+
+    #touchMoveSlider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        border: 2px solid rgba(255, 255, 255, 0.9);
+        background: #ffffff;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+    }
+
+    #touchMoveSlider::-moz-range-thumb {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        border: 2px solid rgba(255, 255, 255, 0.9);
+        background: #ffffff;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+    }
+
+    #touchMoveSlider::-moz-range-track {
+        height: 52px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.35);
+        background: linear-gradient(90deg, rgba(110, 150, 255, 0.35) 0%, rgba(255, 255, 255, 0.18) 50%, rgba(255, 110, 110, 0.35) 100%);
     }
 
     #touchFire {
@@ -430,8 +474,8 @@ body {
     #mobileMovePad {
         left: calc(env(safe-area-inset-left, 0px) + 10px);
         bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
-        grid-template-columns: repeat(2, minmax(58px, 72px));
-        gap: 8px;
+        width: min(46vw, 170px);
+        gap: 6px;
     }
 
     #mobileControls button {
@@ -444,6 +488,10 @@ body {
         bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
         min-width: 116px;
         font-size: 13px;
+    }
+
+    #touchMoveSlider {
+        height: 46px;
     }
 }
 

@@ -78,11 +78,9 @@ const enemyCountValue = document.getElementById('enemyCountValue');
 const enemySpeedValue = document.getElementById('enemySpeedValue');
 const controlSpeedValue = document.getElementById('controlSpeedValue');
 const mobileControls = document.getElementById('mobileControls');
-const touchLeftButton = document.getElementById('touchLeft');
-const touchRightButton = document.getElementById('touchRight');
+const touchMoveSlider = document.getElementById('touchMoveSlider');
 const touchFireButton = document.getElementById('touchFire');
-let touchLeftActive = false;
-let touchRightActive = false;
+let touchMoveValue = 0;
 let mouseTargetX = 0;
 const pointerNDC = new THREE.Vector2(0, 0);
 const pointerWorld = new THREE.Vector3();
@@ -247,6 +245,8 @@ function startGame() {
     player = createPlayer();
     player.position.set(0, -4, 0);
     mouseTargetX = player.position.x;
+    touchMoveValue = 0;
+    if (touchMoveSlider) touchMoveSlider.value = '0';
     scene.add(player);
 }
 
@@ -273,21 +273,18 @@ enemyCountSlider.addEventListener('input', updateSettings);
 enemySpeedSlider.addEventListener('input', updateSettings);
 controlSpeedSlider.addEventListener('input', updateSettings);
 
-if (touchLeftButton) {
-    const setTouchActive = (active) => touchLeftActive = active;
-    touchLeftButton.addEventListener('touchstart', (e) => { e.preventDefault(); setTouchActive(true); });
-    touchLeftButton.addEventListener('touchend', () => setTouchActive(false));
-    touchLeftButton.addEventListener('mousedown', () => setTouchActive(true));
-    touchLeftButton.addEventListener('mouseup', () => setTouchActive(false));
-    touchLeftButton.addEventListener('mouseleave', () => setTouchActive(false));
-}
-if (touchRightButton) {
-    const setTouchActive = (active) => touchRightActive = active;
-    touchRightButton.addEventListener('touchstart', (e) => { e.preventDefault(); setTouchActive(true); });
-    touchRightButton.addEventListener('touchend', () => setTouchActive(false));
-    touchRightButton.addEventListener('mousedown', () => setTouchActive(true));
-    touchRightButton.addEventListener('mouseup', () => setTouchActive(false));
-    touchRightButton.addEventListener('mouseleave', () => setTouchActive(false));
+if (touchMoveSlider) {
+    const updateTouchMoveValue = () => {
+        touchMoveValue = THREE.MathUtils.clamp(parseFloat(touchMoveSlider.value) || 0, -100, 100) / 100;
+    };
+    const releaseTouchMove = () => {
+        touchMoveSlider.value = '0';
+        touchMoveValue = 0;
+    };
+    touchMoveSlider.addEventListener('input', updateTouchMoveValue);
+    touchMoveSlider.addEventListener('touchend', releaseTouchMove);
+    touchMoveSlider.addEventListener('mouseup', releaseTouchMove);
+    touchMoveSlider.addEventListener('mouseleave', releaseTouchMove);
 }
 if (touchFireButton) {
     touchFireButton.addEventListener('touchstart', (e) => { e.preventDefault(); createBullet(); });
@@ -377,6 +374,7 @@ function updateMouseTargetFromPointer(event) {
 }
 
 function handlePointerUpdate(event) {
+    if (event.pointerType === 'touch') return;
     if (!gameRunning || !player || paused) return;
     const targetX = updateMouseTargetFromPointer(event);
     if (targetX === null) return;
@@ -390,6 +388,7 @@ if ('onpointerrawupdate' in window) {
     window.addEventListener('pointerrawupdate', handlePointerUpdate);
 }
 window.addEventListener('pointerdown', (event) => {
+    if (event.pointerType === 'touch') return;
     if (!gameRunning || !player || paused || event.button !== 0) return;
     const targetX = updateMouseTargetFromPointer(event);
     if (targetX === null) return;
@@ -430,8 +429,9 @@ function animate() {
 
     if (gameRunning && !paused) {
         player.position.x = mouseTargetX;
-        if (keys['ArrowLeft'] || touchLeftActive) player.position.x -= playerSpeed;
-        if (keys['ArrowRight'] || touchRightActive) player.position.x += playerSpeed;
+        if (keys['ArrowLeft']) player.position.x -= playerSpeed;
+        if (keys['ArrowRight']) player.position.x += playerSpeed;
+        if (touchMoveValue !== 0) player.position.x += touchMoveValue * playerSpeed * 1.8;
         player.position.x = THREE.MathUtils.clamp(player.position.x, -5, 5);
 
         const now = performance.now();
