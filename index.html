@@ -7,18 +7,57 @@
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
 </head>
 <body>
+    <div id="cosmicBackdrop" aria-hidden="true">
+        <div class="starfield starfield-a"></div>
+        <div class="starfield starfield-b"></div>
+        <div class="nebula nebula-left"></div>
+        <div class="nebula nebula-right"></div>
+        <div class="celestial sun"></div>
+        <div class="celestial moon"></div>
+        <div class="orbital orbital-1"></div>
+        <div class="orbital orbital-2"></div>
+        <div class="comet comet-1"></div>
+        <div class="comet comet-2"></div>
+    </div>
     <div id="homeScreen">
         <div id="homeContent">
             <h1>RPG StarFight</h1>
-            <div id="playerSelection">
-                <h2>Choose Your Icon</h2>
-                <button id="star"><i data-lucide="star"></i> Star</button>
-                <button id="rocket"><i data-lucide="rocket"></i> Rocket</button>
-                <button id="shield"><i data-lucide="shield"></i> Shield</button>
-                <button id="heart"><i data-lucide="heart"></i> Heart</button>
-                <button id="zap"><i data-lucide="zap"></i> Zap</button>
+            <div id="profileLoginCard">
+                <h2 id="profileLoginTitle">My name is ...</h2>
+                <div id="profileLoginRow">
+                    <input id="usernameInput" type="text" maxlength="24" placeholder="Enter unique username">
+                    <button id="loginButton">Proceed</button>
+                </div>
+                <div id="loginProgressTrack" aria-hidden="true">
+                    <div id="loginProgressFill"></div>
+                </div>
+                <div id="loginStatus"></div>
             </div>
-            <p id="clickToPlay" style="display: none;">Click to play</p>
+            <div id="playerSelection" style="display: none;">
+                <h2>Choose Your Icon</h2>
+                <div id="playerSelectionScroll">
+                    <button data-player-type="star" title="Star" aria-label="Star"><i data-lucide="star"></i></button>
+                    <button data-player-type="rocket" title="Rocket" aria-label="Rocket"><i data-lucide="rocket"></i></button>
+                    <button data-player-type="shield" title="Shield" aria-label="Shield"><i data-lucide="shield"></i></button>
+                    <button data-player-type="heart" title="Heart" aria-label="Heart"><i data-lucide="heart"></i></button>
+                    <button data-player-type="zap" title="Zap" aria-label="Zap"><i data-lucide="zap"></i></button>
+                    <button data-player-type="sun" title="Sun" aria-label="Sun"><i data-lucide="sun"></i></button>
+                    <button data-player-type="moon" title="Moon" aria-label="Moon"><i data-lucide="moon"></i></button>
+                    <button data-player-type="sparkles" title="Sparkles" aria-label="Sparkles"><i data-lucide="sparkles"></i></button>
+                    <button data-player-type="crosshair" title="Crosshair" aria-label="Crosshair"><i data-lucide="crosshair"></i></button>
+                    <button data-player-type="compass" title="Compass" aria-label="Compass"><i data-lucide="compass"></i></button>
+                    <button data-player-type="radar" title="Radar" aria-label="Radar"><i data-lucide="radar"></i></button>
+                    <button data-player-type="satellite" title="Satellite" aria-label="Satellite"><i data-lucide="satellite"></i></button>
+                    <button data-player-type="atom" title="Atom" aria-label="Atom"><i data-lucide="atom"></i></button>
+                    <button data-player-type="orbit" title="Orbit" aria-label="Orbit"><i data-lucide="orbit"></i></button>
+                    <button data-player-type="flame" title="Flame" aria-label="Flame"><i data-lucide="flame"></i></button>
+                </div>
+            </div>
+            <div id="profileStatsPanel" style="display: none;">
+                <div id="profileStatsTitle">Profile Stats</div>
+                <ul id="profileStats"></ul>
+            </div>
+            <p id="clickToPlay" style="display: none;">Are you ready to rumble</p>
             <button id="startButton" style="display: none;">Start Game</button>
         </div>
     </div>
@@ -58,10 +97,24 @@
             <label for="controlSpeedSlider">Control speed: <span id="controlSpeedValue">1.0</span></label>
             <input id="controlSpeedSlider" type="range" min="1" max="10" step="0.1" value="1">
         </div>
+        <div class="sidebar-card sidebar-card-bottom" id="highscoreCard">
+            <div class="sidebar-card-header">
+                <span>Career Record</span>
+                <i data-lucide="trophy"></i>
+            </div>
+            <div id="activeProfile">Profile: Guest</div>
+            <div id="highestScore">Highest Score: 0</div>
+            <div id="bestRank">Best Rank: Novice</div>
+            <div id="lastRank">Current Rank: Novice</div>
+            <div id="topRunsTitle">Top Runs</div>
+            <ol id="topRuns"></ol>
+            <button id="switchProfileButton" class="hud-button">Switch Profile</button>
+        </div>
     </div>
     <div id="hud">
         <div id="score">Score: 0</div>
         <div id="timer">Time: 30 | Missed: 0/5</div>
+        <div id="rank">Level: Novice</div>
         <div id="instructions">Use LEFT/RIGHT arrows to move, press SPACE to shoot.</div>
         <button id="pauseButton" class="hud-button">Pause</button>
     </div>
@@ -92,7 +145,20 @@
         <button id="replayButton">Replay</button>
         <button id="closeButton">Close</button>
     </div>
+    <div id="rewardsStoreModal" style="display: none;">
+        <div class="rewards-store-card">
+            <div class="rewards-store-header">
+                <h2>RPG Star Fight Rewards Store</h2>
+                <button id="closeRewardsStore" class="store-close-button" aria-label="Close rewards store">X</button>
+            </div>
+            <p id="rewardsStoreWelcome"></p>
+            <div id="sparksBalance">Sparks: 0</div>
+            <div id="rewardsStoreGrid"></div>
+        </div>
+    </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
