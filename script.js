@@ -450,7 +450,7 @@ function updateSidebarRankingDisplay() {
         { label: 'Harmed', value: activeProfile.totalHarmed || 0, icon: 'triangle-alert', tone: 'red' },
         { label: 'Hits', value: activeProfile.totalHits || 0, icon: 'shield-alert', tone: 'orange' },
         { label: 'Missed', value: activeProfile.totalMissed || 0, icon: 'target', tone: 'pink' },
-        { label: 'Reward', value: activeProfile.rewardPoints || 0, icon: 'gem', tone: 'cyan', key: 'sparks' },
+        { label: 'Rewards', value: activeProfile.rewardPoints || 0, icon: 'gem', tone: 'cyan', key: 'sparks' },
         { label: 'Best Score', value: activeProfile.highestScore || 0, icon: 'trophy', tone: 'gold' },
         { label: 'Best Rank', value: activeProfile.bestRank || 'Novice', icon: 'star', tone: 'purple' }
     ];
