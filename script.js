@@ -1,14 +1,39 @@
+function getViewportSize() {
+    const vv = window.visualViewport;
+    const width = Math.max(1, Math.round((vv && vv.width) || window.innerWidth || document.documentElement.clientWidth || 1));
+    const height = Math.max(1, Math.round((vv && vv.height) || window.innerHeight || document.documentElement.clientHeight || 1));
+    return { width, height };
+}
+
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+const initialViewport = getViewportSize();
+const camera = new THREE.PerspectiveCamera(75, initialViewport.width / initialViewport.height, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-renderer.domElement.style.position = 'absolute';
+renderer.domElement.style.position = 'fixed';
+renderer.domElement.style.inset = '0';
 renderer.domElement.style.top = '0';
 renderer.domElement.style.left = '0';
+renderer.domElement.style.width = '100%';
+renderer.domElement.style.height = '100%';
 renderer.domElement.style.zIndex = '0';
 renderer.domElement.style.touchAction = 'none';
 document.body.appendChild(renderer.domElement);
+
+function resizeGameViewport() {
+    const { width, height } = getViewportSize();
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+    renderer.setSize(width, height, false);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    const canvas = renderer.domElement;
+    canvas.style.position = 'fixed';
+    canvas.style.inset = '0';
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+}
+
+resizeGameViewport();
 
 let lastTouchEnd = 0;
 document.addEventListener('touchstart', (event) => {
@@ -742,8 +767,8 @@ function viewportExtentsForBackgroundZ(z) {
     const halfHeightRaw = Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5)) * distance;
     const halfWidthRaw = halfHeightRaw * camera.aspect;
     return {
-        halfWidth: THREE.MathUtils.clamp(halfWidthRaw, 8, 14.5),
-        halfHeight: THREE.MathUtils.clamp(halfHeightRaw, 4.5, 8.8)
+        halfWidth: THREE.MathUtils.clamp(halfWidthRaw, 8, 22),
+        halfHeight: THREE.MathUtils.clamp(halfHeightRaw, 3.2, 8.8)
     };
 }
 
@@ -933,6 +958,13 @@ function getMoveAxis() {
     return THREE.MathUtils.clamp(inputState.keyboardAxis + inputState.touchAxis, -1, 1);
 }
 
+function getPlayfieldHalfWidth() {
+    const distance = Math.max(0.1, camera.position.z);
+    const halfHeight = Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5)) * distance;
+    const halfWidth = halfHeight * camera.aspect;
+    return THREE.MathUtils.clamp(halfWidth - 0.85, 3.4, 18);
+}
+
 function updateFullscreenPromptVisibility() {
     if (!fullscreenPromptElement) return;
     const mode = getDisplayModeState();
@@ -948,6 +980,12 @@ function isFullscreenActive() {
     );
 }
 
+function lockLandscapeOrientation() {
+    const orientation = screen.orientation;
+    if (!orientation || typeof orientation.lock !== 'function') return;
+    orientation.lock('landscape').catch(() => {});
+}
+
 function requestFullscreenForLandscape() {
     if (!isMobileTouch()) return;
     const isLandscape = window.matchMedia('(orientation: landscape)').matches;
@@ -956,7 +994,8 @@ function requestFullscreenForLandscape() {
         return;
     }
 
-    const fullscreenTargets = [renderer.domElement, document.documentElement, document.body].filter(Boolean);
+    lockLandscapeOrientation();
+    const fullscreenTargets = [document.documentElement, document.body, renderer.domElement].filter(Boolean);
     for (const target of fullscreenTargets) {
         const requestFullscreen =
             target.requestFullscreen ||
@@ -1053,6 +1092,8 @@ function startGame() {
     scene.add(player);
     updateDisplayMode();
     updateSidebarRankingDisplay();
+    resizeGameViewport();
+    lockLandscapeOrientation();
     requestFullscreenForLandscape();
 }
 
@@ -1198,12 +1239,15 @@ window.addEventListener('pointerdown', requestFullscreenForLandscape);
 document.addEventListener('fullscreenchange', updateFullscreenPromptVisibility);
 document.addEventListener('webkitfullscreenchange', updateFullscreenPromptVisibility);
 document.addEventListener('msfullscreenchange', updateFullscreenPromptVisibility);
-window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+window.addEventListener('resize', resizeGameViewport);
+window.addEventListener('orientationchange', () => {
+    window.setTimeout(resizeGameViewport, 120);
+    window.setTimeout(resizeGameViewport, 400);
 });
+if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', resizeGameViewport);
+    window.visualViewport.addEventListener('scroll', resizeGameViewport);
+}
 
 const spawnLineThreshold = 2.5;
 let enemySpawnIntervalMs = 2000;
@@ -1222,17 +1266,20 @@ function canSpawnEnemy() {
 }
 
 function getCivilianSpawnX() {
+    const half = getPlayfieldHalfWidth();
+    const inner = Math.max(1.8, half * 0.42);
+    const outer = Math.max(inner + 0.6, half - 0.5);
     for (let i = 0; i < 12; i++) {
         const candidate = Math.random() < 0.5
-            ? THREE.MathUtils.randFloat(-4.5, -2.2)
-            : THREE.MathUtils.randFloat(2.2, 4.5);
+            ? THREE.MathUtils.randFloat(-outer, -inner)
+            : THREE.MathUtils.randFloat(inner, outer);
         const tooCloseToEnemy = enemies.some(enemy => Math.abs(enemy.position.x - candidate) < civilianSpawnEnemyClearanceX);
         const tooCloseToPlayer = player && Math.abs(player.position.x - candidate) < civilianSpawnPlayerClearanceX;
         if (!tooCloseToEnemy && !tooCloseToPlayer) return candidate;
     }
     return Math.random() < 0.5
-        ? THREE.MathUtils.randFloat(-4.5, -2.2)
-        : THREE.MathUtils.randFloat(2.2, 4.5);
+        ? THREE.MathUtils.randFloat(-outer, -inner)
+        : THREE.MathUtils.randFloat(inner, outer);
 }
 
 function isCivilianInProtectedFireLane(civilian) {
@@ -1270,7 +1317,8 @@ function updateMouseTargetFromPointer(event) {
     if (Math.abs(direction.z) < 0.0001) return null;
     const t = -camera.position.z / direction.z;
     const worldX = camera.position.x + direction.x * t;
-    return THREE.MathUtils.clamp(worldX, -5, 5);
+    const half = getPlayfieldHalfWidth();
+    return THREE.MathUtils.clamp(worldX, -half, half);
 }
 
 function handlePointerUpdate(event) {
@@ -1354,6 +1402,7 @@ function animate() {
     updateBackgroundPlanets(now, deltaSeconds);
 
     if (gameRunning && !paused) {
+        const playHalfWidth = getPlayfieldHalfWidth();
         const moveAxis = getMoveAxis();
         if (!isMobileTouch() && moveAxis === 0) {
             player.position.x = mouseTargetX;
@@ -1361,12 +1410,12 @@ function animate() {
             player.position.x += moveAxis * playerSpeed * 1.8;
             mouseTargetX = player.position.x;
         }
-        player.position.x = THREE.MathUtils.clamp(player.position.x, -5, 5);
+        player.position.x = THREE.MathUtils.clamp(player.position.x, -playHalfWidth, playHalfWidth);
 
         if (now - lastSpawnTime > enemySpawnIntervalMs && canSpawnEnemy()) {
             lastSpawnTime = now;
             const enemy = createEnemy();
-            enemy.position.set((Math.random() - 0.5) * 10, 5, 0);
+            enemy.position.set((Math.random() - 0.5) * playHalfWidth * 2, 5, 0);
             scene.add(enemy);
             enemies.push(enemy);
         }
@@ -1447,10 +1496,10 @@ function animate() {
             civilian.userData.vx = THREE.MathUtils.clamp(civilian.userData.vx * 0.98, -0.06, 0.06);
             civilian.position.y -= civilianFallSpeed;
             civilian.position.x += civilian.userData.vx;
-            if (civilian.position.x < -4.8 || civilian.position.x > 4.8) {
+            if (civilian.position.x < -playHalfWidth || civilian.position.x > playHalfWidth) {
                 civilian.userData.vx *= -1;
             }
-            civilian.position.x = THREE.MathUtils.clamp(civilian.position.x, -4.8, 4.8);
+            civilian.position.x = THREE.MathUtils.clamp(civilian.position.x, -playHalfWidth, playHalfWidth);
             if (civilian.position.y < -6) {
                 if (!civilian.userData.hurt) {
                     civilianSaved += 1;
@@ -1471,7 +1520,7 @@ function animate() {
 
         enemyBullets.forEach(bullet => {
             bullet.position.add(bullet.userData.direction.clone().multiplyScalar(0.1));
-            if (bullet.position.y < -6 || bullet.position.y > 6 || Math.abs(bullet.position.x) > 6) {
+            if (bullet.position.y < -6 || bullet.position.y > 6 || Math.abs(bullet.position.x) > playHalfWidth + 1.2) {
                 scene.remove(bullet);
                 enemyBullets.splice(enemyBullets.indexOf(bullet), 1);
             }
